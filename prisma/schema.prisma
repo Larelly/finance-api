@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  timezone     String   @default("America/Sao_Paulo")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  refreshTokens RefreshToken[]
+  categories    Category[]
+  transactions  Transaction[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId], name: "idx_refresh_user")
+  @@index([tokenHash], name: "idx_refresh_token_hash")
+  @@map("refresh_tokens")
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+model Category {
+  id     String          @id @default(uuid())
+  userId String          @map("user_id")
+  name   String
+  type   TransactionType
+
+  user         User          @relation(fields: [userId], references: [id])
+  transactions Transaction[]
+
+  @@unique([userId, name, type])
+  @@map("categories")
+}
+
+model Transaction {
+  id           String          @id @default(uuid())
+  userId       String          @map("user_id")
+  categoryId   String          @map("category_id")
+  type         TransactionType
+  amountCents  BigInt          @map("amount_cents")
+  description  String?
+  occurredAt   DateTime        @map("occurred_at")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+  deletedAt    DateTime?       @map("deleted_at")
+
+  user     User     @relation(fields: [userId], references: [id])
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@index([userId, occurredAt(sort: Desc)], name: "idx_tx_user_occurred")
+  @@index([userId, categoryId], name: "idx_tx_user_category")
+  @@map("transactions")
+}
