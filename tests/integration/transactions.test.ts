@@ -122,6 +122,92 @@ describe("transactions", () => {
     expect(getDeletedResponse.status).toBe(404);
   });
 
+  it("gets a transaction by id", async () => {
+    const { accessToken } = await registerAndLogin(app);
+    const category = await createCategory(app, accessToken);
+
+    const created = await request(app.server)
+      .post("/api/v1/transactions")
+      .set("authorization", `Bearer ${accessToken}`)
+      .send({
+        categoryId: category.id,
+        type: "EXPENSE",
+        amountCents: 4200,
+        occurredAt: "2026-08-10T12:00:00Z",
+      });
+
+    const response = await request(app.server)
+      .get(`/api/v1/transactions/${created.body.id}`)
+      .set("authorization", `Bearer ${accessToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.amountCents).toBe(4200);
+  });
+
+  it("updates a transaction's amount and description", async () => {
+    const { accessToken } = await registerAndLogin(app);
+    const category = await createCategory(app, accessToken);
+
+    const created = await request(app.server)
+      .post("/api/v1/transactions")
+      .set("authorization", `Bearer ${accessToken}`)
+      .send({
+        categoryId: category.id,
+        type: "EXPENSE",
+        amountCents: 1000,
+        occurredAt: "2026-08-10T12:00:00Z",
+      });
+
+    const response = await request(app.server)
+      .patch(`/api/v1/transactions/${created.body.id}`)
+      .set("authorization", `Bearer ${accessToken}`)
+      .send({ amountCents: 2500, description: "Ajustado" });
+
+    expect(response.status).toBe(200);
+    expect(response.body.amountCents).toBe(2500);
+    expect(response.body.description).toBe("Ajustado");
+  });
+
+  it("updates a transaction's category, re-validating the type match", async () => {
+    const { accessToken } = await registerAndLogin(app);
+    const expenseCategory = await createCategory(app, accessToken, { name: "Mercado", type: "EXPENSE" });
+    const otherExpenseCategory = await createCategory(app, accessToken, { name: "Lazer", type: "EXPENSE" });
+    const incomeCategory = await createCategory(app, accessToken, { name: "Salário", type: "INCOME" });
+
+    const created = await request(app.server)
+      .post("/api/v1/transactions")
+      .set("authorization", `Bearer ${accessToken}`)
+      .send({
+        categoryId: expenseCategory.id,
+        type: "EXPENSE",
+        amountCents: 1000,
+        occurredAt: "2026-08-10T12:00:00Z",
+      });
+
+    const validMove = await request(app.server)
+      .patch(`/api/v1/transactions/${created.body.id}`)
+      .set("authorization", `Bearer ${accessToken}`)
+      .send({ categoryId: otherExpenseCategory.id });
+    expect(validMove.status).toBe(200);
+
+    const invalidMove = await request(app.server)
+      .patch(`/api/v1/transactions/${created.body.id}`)
+      .set("authorization", `Bearer ${accessToken}`)
+      .send({ categoryId: incomeCategory.id });
+    expect(invalidMove.status).toBe(400);
+  });
+
+  it("returns 404 when updating a transaction that does not exist", async () => {
+    const { accessToken } = await registerAndLogin(app);
+
+    const response = await request(app.server)
+      .patch("/api/v1/transactions/00000000-0000-0000-0000-000000000000")
+      .set("authorization", `Bearer ${accessToken}`)
+      .send({ amountCents: 1000 });
+
+    expect(response.status).toBe(404);
+  });
+
   it("does not let user A see or delete user B's transactions", async () => {
     const userA = await registerAndLogin(app);
     const userB = await registerAndLogin(app);

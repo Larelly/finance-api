@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 
 FROM node:22-alpine AS base
+RUN apk add --no-cache openssl
 WORKDIR /app
 
 FROM base AS deps
@@ -23,7 +24,7 @@ COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY docker/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
-RUN addgroup -S app && adduser -S app -G app
+RUN addgroup -S app && adduser -S app -G app && chown -R app:app /app
 USER app
 
 EXPOSE 3000

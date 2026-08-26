@@ -33,7 +33,12 @@ const sortSchema = z
 
 export const listTransactionsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().positive().max(100).default(20),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(20)
+    .transform((value) => Math.min(value, 100)),
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
   categoryId: z.string().uuid().optional(),
